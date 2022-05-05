@@ -1,5 +1,6 @@
 patches-own [ quality ]
 breed [ bees bee ]
+bees-own [ waiting_time ] ; TODO check if it must be renames to "t" ?
 
 to setup
   clear-all
@@ -35,25 +36,65 @@ to populate_with_bees
     set shape "bee 2"
     set xcor random-xcor
     set ycor random-ycor
+    set waiting_time 0
   ]
 end
 
 to go
   ask bees [
-    if random 100 <= 9 [
+    ; TODO: Check if fast enough or too less steps after waiting?!
+    (ifelse waiting_time >= 1
+      [
+        ;set color red
+        set waiting_time (waiting_time - 1)
+      ]
+      waiting_time < 1 and waiting_time >= 0
+      [
+        ;set color white
+        set waiting_time (waiting_time - 1)
+        go_a_step
+      ]
+      count bees in-cone 1.5 120 > 0
+      [ set waiting_time quality ]
+      [ go_a_step ]
+    )
+  ]
+  tick
+end
+
+to go_a_step
+  (ifelse patch-ahead 1 = nobody
+    [ turn_away_from_border ]
+    random 100 <= 9
+    [
       rt random 50
       lt random 50
     ]
-    fd 1
-  ]
-  tick
+  )
+  fd 1
 end
 
 to colorize
   ask patches [ set pcolor scale-color green quality 0 125 ]
 end
 
-;if patch-aheas 1 = nobody
+to turn_away_from_border
+  let h random 181
+  ;show xcor
+  (ifelse
+    ycor < 1 [ set h (h + 270) ]
+    ;xcor = 0 [ set h (h + 0) ]
+    ycor > (max-pycor - 1) [ set h (h + 90) ]
+    xcor > (max-pxcor - 1) [ set h (h + 180) ]
+    )
+
+  if h > 360 [set h (h - 360)]
+  set heading h
+end
+
+to plot_optima
+
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -108,7 +149,7 @@ population_size
 population_size
 0
 500
-200.0
+207.0
 1
 1
 NIL
@@ -122,6 +163,23 @@ BUTTON
 NIL
 go
 T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+103
+165
+184
+198
+go once
+go
+NIL
 1
 T
 OBSERVER
