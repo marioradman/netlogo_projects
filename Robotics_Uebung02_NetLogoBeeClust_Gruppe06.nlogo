@@ -1,6 +1,6 @@
 patches-own [ quality ]
 breed [ bees bee ]
-bees-own [ waiting_time ] ; TODO check if it must be renames to "t" ?
+bees-own [ waiting-time ]
 
 to setup
   clear-all
@@ -36,37 +36,33 @@ to populate_with_bees
     set shape "bee 2"
     set xcor random-xcor
     set ycor random-ycor
-    set waiting_time 0
+    set waiting-time -1
   ]
 end
 
 to go
   ask bees [
-    ; TODO: Check if fast enough or too less steps after waiting?!
-    (ifelse waiting_time >= 1
-      [
-        ;set color red
-        set waiting_time (waiting_time - 1)
-      ]
-      waiting_time < 1 and waiting_time >= 0
-      [
-        ;set color white
-        set waiting_time (waiting_time - 1)
-        go_a_step
-      ]
+    (ifelse waiting-time >= 1
+      [set waiting-time (waiting-time - 1)]
+      ((waiting-time < 1) and (waiting-time >= 0))
+      [set waiting-time (waiting-time - 1)
+        go_a_step]
       count bees in-cone 1.5 120 > 0
-      [ set waiting_time quality ]
+      [ set waiting-time quality ]
       [ go_a_step ]
     )
-    plot_optima
   ]
+  plot_optima
   tick
 end
 
 to go_a_step
+  let p bees_turn_chance - 1
+
+  ; according to oral instructions, the turn should be random but in a cone-direction so not to deviate in an unnatural way
   (ifelse patch-ahead 1 = nobody
     [ turn_away_from_border ]
-    random 100 <= 9
+    random 100 <= p
     [
       rt random 50
       lt random 50
@@ -81,10 +77,8 @@ end
 
 to turn_away_from_border
   let h random 181
-  ;show xcor
   (ifelse
     ycor < 1 [ set h (h + 270) ]
-    ;xcor = 0 [ set h (h + 0) ]
     ycor > (max-pycor - 1) [ set h (h + 90) ]
     xcor > (max-pxcor - 1) [ set h (h + 180) ]
     )
@@ -95,21 +89,21 @@ end
 
 to plot_optima
   set-current-plot "at_optima"
-  ifelse pycor > (max-pycor / 2)
-  [
     set-current-plot-pen "global"
     plot count bees with [quality > 1.1 and pxcor > (max-pxcor / 2)]
-  ]
-  [
     set-current-plot-pen "local"
     plot count bees with [quality > 1.1 and pxcor < (max-pxcor / 2)]
-  ]
+end
+
+to reset_sliders_to_default
+  set population_size 200
+  set bees_turn_chance 10
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
+243
 10
-1011
+1044
 552
 -1
 -1
@@ -134,10 +128,10 @@ ticks
 30.0
 
 BUTTON
-30
-56
-96
-89
+9
+10
+120
+79
 NIL
 setup
 NIL
@@ -151,25 +145,25 @@ NIL
 1
 
 SLIDER
-26
-117
-198
-150
+9
+86
+237
+119
 population_size
 population_size
 0
 500
-3.0
+200.0
 1
 1
 NIL
 HORIZONTAL
 
 BUTTON
-114
-57
-177
-90
+127
+10
+236
+43
 NIL
 go
 T
@@ -183,10 +177,10 @@ NIL
 1
 
 BUTTON
-103
-165
-184
-198
+127
+46
+236
+79
 go once
 go
 NIL
@@ -201,9 +195,9 @@ NIL
 
 PLOT
 6
-212
-206
-362
+233
+238
+407
 at_optima
 NIL
 NIL
@@ -220,14 +214,46 @@ PENS
 
 MONITOR
 6
-367
-200
-412
+416
+238
+465
 ratio of turtles at global optimum
-100 / population_size * (count bees with [quality > 1.1 and pxcor > (max-pxcor / 2)])
-17
+100 / (count bees) * (count bees with [quality > 1.1 and pxcor > (max-pxcor / 2)])
+2
 1
-11
+12
+
+BUTTON
+8
+164
+237
+197
+reset sliders to default
+reset_sliders_to_default
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+9
+125
+238
+158
+bees_turn_chance
+bees_turn_chance
+0
+100
+10.0
+1
+1
+%
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
