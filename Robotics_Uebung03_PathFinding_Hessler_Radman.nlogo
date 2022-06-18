@@ -1,135 +1,296 @@
-globals [ global_current_robot_step ]
+; Simulation of a Robot with path finding
+; Excercise 03 from course "Robotics" in SS22 at FH Joanneum
+; Authors: Andrea Hessler and Mario Radman - MSD20
+; Dates of last changes: 18.06.2022
 
+; This project should simulate a robot and a path finding algorithm.
+; After finding the best path for the robot, the robot is following the path.
+; Additionally some parameters can be changed and/or monitored.
+
+globals [ global_current_robot_step ]
+breed [ robots robot ]
+patches-own [ value ]
+
+; setup of the world with all needed patches for the maze, default values and params and the robot
 to setup
+  clear-all
   setup-maze
+
   ask patches [
-    if pcolor = black [ set plabel "" ]
-    if pcolor = white [ set plabel "-1"]
-    set plabel-color 140
+    if pcolor = black [
+      set value -2
+      set plabel ""
+    ]
+    if pcolor = white [
+      set value -1
+      set plabel value
+      set plabel-color white
+      set pcolor blue
+    ]
+    if pxcor = -8 and pycor = -8 [
+      set value -3
+      set plabel value
+      set pcolor red
+    ]
+
+    ; The instructions are saing, that we should use 3,8 as coordinates. Those doesn't match the maze.
+    ; The supposed coordinates are 4,8 what matches also what we have seen in the Demo during the lecture.
+    if pxcor = 4 and pycor = 8 [
+      set value 0
+      set plabel value
+      set pcolor blue
+    ]
+  ]
+
+  create-robots 1 [
+    set xcor -8
+    set ycor -8
+    set size 1
+    set color black
+    set heading 90
+  ]
+
+  set state "find_shortest_path"
+  set global_current_robot_step 0
+  reset-ticks
+end
+
+; additionally to the default setup, the goal is being reset and set to a default patch (except boarders and start)
+to setup-and-randomize-goal
+  setup
+  ask patch 4 8 [
+    set value -1
+    set plabel value
+  ]
+  ask one-of patches with [value = -1] [
+    set value 0
+    set plabel value
   ]
 end
 
+; additionally to the default setup, the goal is set inside a box and cannot be reached. Just for experimentary purposes
+to setup-and-set-goal-in-box
+  setup
+  ask patch 4 8 [
+    set value -1
+    set plabel value
+  ]
+  ask patch -5 4 [
+    set value 0
+    set plabel value
+  ]
+end
+
+; standard tick behaviour
+to go
+  if (state = "reached_goal") [reached_goal]
+  if (state = "go_path")[algo-go]
+  if (state = "find_shortest_path") [algo-search]
+  tick
+end
+
+; search algorithm for the shortest way from the goal to the robot. The found way is saved inside the patches (with changing of the value, label and color of the patches)
+to algo-search
+  if ticks >= max-steps [
+    show "Maximum of steps reaches. Increase the maximum of ticks or change other parameters, then reset it via the 'setup' button and start again."
+    stop
+  ]
+
+  ask patches [
+    if (pcolor = red and not (value = -3)) [
+      let new-step-value (value + 1)
+      patch-value-change new-step-value (pxcor + 1) pycor
+      patch-value-change new-step-value (pxcor - 1) pycor
+      patch-value-change new-step-value pxcor (pycor + 1)
+      patch-value-change new-step-value pxcor (pycor - 1)
+    ]
+  ]
+
+  ask patches [
+    if not (value < 0) [
+      set pcolor red
+    ]
+    if (pxcor = -8) and (pycor = -8) and not (value = -3) [
+      set pcolor green
+      set state "go_path"
+      set global_current_robot_step (global_current_robot_step - 1)
+    ]
+  ]
+
+  if not (state = "go_path") [ set global_current_robot_step (global_current_robot_step + 1) ]
+
+end
+
+; changes the patch values if it's inside the world and matches the requierements (not a boarder and valid path)
+to patch-value-change [new-step-value patch-xcor patch-ycor]
+  if not (patch-xcor > 8 or patch-xcor < -8 or patch-ycor > 8 or patch-ycor < -8) [
+    ask patch patch-xcor patch-ycor [
+      if (not (value = -2)) and ((value = -1) or (value = -3) or (value > new-step-value)) [
+        set value new-step-value
+        set plabel value
+      ]
+    ]
+  ]
+end
+
+; the robot goes the found path back to the goal
+to algo-go
+  ask robots [
+    let patch-xcor 0
+    let patch-ycor 0
+    let lowest-number -1
+
+    ask neighbors4 [
+      if (value >= 0) and (value = lowest-number) and (random 2 = 0) [
+        set patch-xcor pxcor
+        set patch-ycor pycor
+      ]
+
+      if (value >= 0) and ((value < lowest-number) or (lowest-number = -1)) [
+        set patch-xcor pxcor
+        set patch-ycor pycor
+        set lowest-number value
+      ]
+    ]
+
+    set heading towards patch patch-xcor patch-ycor
+    fd 1
+    set pcolor green
+
+    if value = 0 [
+      set state "reached_goal"
+    ]
+  ]
+  set global_current_robot_step (global_current_robot_step - 1)
+end
+
+; when the goal is reached, only this message will be printed
+to reached_goal
+  show "Reached goal, nothing to do."
+end
+
+; default maze setup
 to setup-maze
-ask patches [ set pcolor white]
-ask patch -8 8 [ set pcolor black]
-ask patch -8 7 [ set pcolor black]
-ask patch -7 8 [ set pcolor black]
-ask patch -6 8 [ set pcolor black]
-ask patch -5 8 [ set pcolor black]
-ask patch -4 8 [ set pcolor black]
-ask patch -3 8 [ set pcolor black]
-ask patch -2 8 [ set pcolor black]
-ask patch -1 8 [ set pcolor black]
-ask patch 1 8 [ set pcolor black]
-ask patch 0 8 [ set pcolor black]
-ask patch 2 8 [ set pcolor black]
-ask patch 3 8 [ set pcolor black]
-ask patch 6 8 [ set pcolor black]
-ask patch 7 8 [ set pcolor black]
-ask patch 8 8 [ set pcolor black]
-ask patch -8 6 [ set pcolor black]
-ask patch -8 5 [ set pcolor black]
-ask patch -8 4 [ set pcolor black]
-ask patch -8 3 [ set pcolor black]
-ask patch -8 2 [ set pcolor black]
-ask patch -8 1 [ set pcolor black]
-ask patch -8 0 [ set pcolor black]
-ask patch -8 -1 [ set pcolor black]
-ask patch -8 -2 [ set pcolor black]
-ask patch -8 -3 [ set pcolor black]
-ask patch -8 -4 [ set pcolor black]
-ask patch -8 -5 [ set pcolor black]
-ask patch -8 -6 [ set pcolor black]
-ask patch -8 -7 [ set pcolor black]
-ask patch -7 -7 [ set pcolor black]
-ask patch -6 -7 [ set pcolor black]
-ask patch -5 -7 [ set pcolor black]
-ask patch -4 -7 [ set pcolor black]
-ask patch -3 -7 [ set pcolor black]
-ask patch -2 -7 [ set pcolor black]
-ask patch -1 -7 [ set pcolor black]
-ask patch 1 -7 [ set pcolor black]
-ask patch 0 -7 [ set pcolor black]
-ask patch 2 -7 [ set pcolor black]
-ask patch 3 -7 [ set pcolor black]
-ask patch 4 -7 [ set pcolor black]
-ask patch 5 -7 [ set pcolor black]
-ask patch 8 -7 [ set pcolor black]
-ask patch 8 8  [ set pcolor black]
-ask patch 8 7  [ set pcolor black]
-ask patch 8 6 [ set pcolor black]
-ask patch 8 5 [ set pcolor black]
-ask patch 8 4 [ set pcolor black]
-ask patch 8 3 [ set pcolor black]
-ask patch 8 2 [ set pcolor black]
-ask patch 8 1 [ set pcolor black]
-ask patch 8 0 [ set pcolor black]
-ask patch 8 -1 [ set pcolor black]
-ask patch 8 -2 [ set pcolor black]
-ask patch 8 -3 [ set pcolor black]
-ask patch 8 -4 [ set pcolor black]
-ask patch 8 -5 [ set pcolor black]
-ask patch 8 -6 [ set pcolor black]
-ask patch -6 5 [ set pcolor black]
-ask patch -5 5 [ set pcolor black]
-ask patch -4 5 [ set pcolor black]
-ask patch -4 4 [ set pcolor black]
-ask patch -4 3 [ set pcolor black]
-ask patch -4 2 [ set pcolor black]
-ask patch -4 -1 [ set pcolor black]
-ask patch -4 -2 [ set pcolor black]
-ask patch -4 -3 [ set pcolor black]
-ask patch -4 -4 [ set pcolor black]
-ask patch -5 -4 [ set pcolor black]
-ask patch -6 -4 [ set pcolor black]
-ask patch -1 7 [ set pcolor black]
-ask patch -1 6 [ set pcolor black]
-ask patch -1 5 [ set pcolor black]
-ask patch -1 4 [ set pcolor black]
-ask patch -1 3 [ set pcolor black]
-ask patch -1 2 [ set pcolor black]
-ask patch 2 5 [ set pcolor black]
-ask patch 2 4 [ set pcolor black]
-ask patch 2 3 [ set pcolor black]
-ask patch 2 2 [ set pcolor black]
-ask patch 5 5 [ set pcolor black]
-ask patch 5 4 [ set pcolor black]
-ask patch 5 3 [ set pcolor black]
-ask patch 5 2 [ set pcolor black]
-ask patch 5 1 [ set pcolor black]
-ask patch 5 0 [ set pcolor black]
-ask patch 5 -1 [ set pcolor black]
-ask patch 6 5 [ set pcolor black]
-ask patch 7 5 [ set pcolor black]
-ask patch -1 -1 [ set pcolor black]
-ask patch 0 -1 [ set pcolor black]
-ask patch 1 -1 [ set pcolor black]
-ask patch 2 -1 [ set pcolor black]
-ask patch 3 -1 [ set pcolor black]
-ask patch 4 -1 [ set pcolor black]
-ask patch -1 -2 [ set pcolor black]
-ask patch -1 -3 [ set pcolor black]
-ask patch -1 -4 [ set pcolor black]
-ask patch 0 -4 [ set pcolor black]
-ask patch 1 -4 [ set pcolor black]
-ask patch 2 -4 [ set pcolor black]
-ask patch 3 -4 [ set pcolor black]
-ask patch 4 -4 [ set pcolor black]
-ask patch 5 -4 [ set pcolor black]
-ask patch -6 4 [ set pcolor black]
-ask patch -6 3 [ set pcolor black]
-ask patch -6 2 [ set pcolor black]
-ask patch -5 2 [ set pcolor black]
+  ask patches [ set pcolor white]
+  ask patch -8 8 [ set pcolor black]
+  ask patch -8 7 [ set pcolor black]
+  ask patch -7 8 [ set pcolor black]
+  ask patch -6 8 [ set pcolor black]
+  ask patch -5 8 [ set pcolor black]
+  ask patch -4 8 [ set pcolor black]
+  ask patch -3 8 [ set pcolor black]
+  ask patch -2 8 [ set pcolor black]
+  ask patch -1 8 [ set pcolor black]
+  ask patch 1 8 [ set pcolor black]
+  ask patch 0 8 [ set pcolor black]
+  ask patch 2 8 [ set pcolor black]
+  ask patch 3 8 [ set pcolor black]
+  ask patch 6 8 [ set pcolor black]
+  ask patch 7 8 [ set pcolor black]
+  ask patch 8 8 [ set pcolor black]
+  ask patch -8 6 [ set pcolor black]
+  ask patch -8 5 [ set pcolor black]
+  ask patch -8 4 [ set pcolor black]
+  ask patch -8 3 [ set pcolor black]
+  ask patch -8 2 [ set pcolor black]
+  ask patch -8 1 [ set pcolor black]
+  ask patch -8 0 [ set pcolor black]
+  ask patch -8 -1 [ set pcolor black]
+  ask patch -8 -2 [ set pcolor black]
+  ask patch -8 -3 [ set pcolor black]
+  ask patch -8 -4 [ set pcolor black]
+  ask patch -8 -5 [ set pcolor black]
+  ask patch -8 -6 [ set pcolor black]
+  ask patch -8 -7 [ set pcolor black]
+  ask patch -7 -7 [ set pcolor black]
+  ask patch -6 -7 [ set pcolor black]
+  ask patch -5 -7 [ set pcolor black]
+  ask patch -4 -7 [ set pcolor black]
+  ask patch -3 -7 [ set pcolor black]
+  ask patch -2 -7 [ set pcolor black]
+  ask patch -1 -7 [ set pcolor black]
+  ask patch 1 -7 [ set pcolor black]
+  ask patch 0 -7 [ set pcolor black]
+  ask patch 2 -7 [ set pcolor black]
+  ask patch 3 -7 [ set pcolor black]
+  ask patch 4 -7 [ set pcolor black]
+  ask patch 5 -7 [ set pcolor black]
+  ask patch 8 -7 [ set pcolor black]
+  ask patch 8 8  [ set pcolor black]
+  ask patch 8 7  [ set pcolor black]
+  ask patch 8 6 [ set pcolor black]
+  ask patch 8 5 [ set pcolor black]
+  ask patch 8 4 [ set pcolor black]
+  ask patch 8 3 [ set pcolor black]
+  ask patch 8 2 [ set pcolor black]
+  ask patch 8 1 [ set pcolor black]
+  ask patch 8 0 [ set pcolor black]
+  ask patch 8 -1 [ set pcolor black]
+  ask patch 8 -2 [ set pcolor black]
+  ask patch 8 -3 [ set pcolor black]
+  ask patch 8 -4 [ set pcolor black]
+  ask patch 8 -5 [ set pcolor black]
+  ask patch 8 -6 [ set pcolor black]
+  ask patch -6 5 [ set pcolor black]
+  ask patch -5 5 [ set pcolor black]
+  ask patch -4 5 [ set pcolor black]
+  ask patch -4 4 [ set pcolor black]
+  ask patch -4 3 [ set pcolor black]
+  ask patch -4 2 [ set pcolor black]
+  ask patch -4 -1 [ set pcolor black]
+  ask patch -4 -2 [ set pcolor black]
+  ask patch -4 -3 [ set pcolor black]
+  ask patch -4 -4 [ set pcolor black]
+  ask patch -5 -4 [ set pcolor black]
+  ask patch -6 -4 [ set pcolor black]
+  ask patch -1 7 [ set pcolor black]
+  ask patch -1 6 [ set pcolor black]
+  ask patch -1 5 [ set pcolor black]
+  ask patch -1 4 [ set pcolor black]
+  ask patch -1 3 [ set pcolor black]
+  ask patch -1 2 [ set pcolor black]
+  ask patch 2 5 [ set pcolor black]
+  ask patch 2 4 [ set pcolor black]
+  ask patch 2 3 [ set pcolor black]
+  ask patch 2 2 [ set pcolor black]
+  ask patch 5 5 [ set pcolor black]
+  ask patch 5 4 [ set pcolor black]
+  ask patch 5 3 [ set pcolor black]
+  ask patch 5 2 [ set pcolor black]
+  ask patch 5 1 [ set pcolor black]
+  ask patch 5 0 [ set pcolor black]
+  ask patch 5 -1 [ set pcolor black]
+  ask patch 6 5 [ set pcolor black]
+  ask patch 7 5 [ set pcolor black]
+  ask patch -1 -1 [ set pcolor black]
+  ask patch 0 -1 [ set pcolor black]
+  ask patch 1 -1 [ set pcolor black]
+  ask patch 2 -1 [ set pcolor black]
+  ask patch 3 -1 [ set pcolor black]
+  ask patch 4 -1 [ set pcolor black]
+  ask patch -1 -2 [ set pcolor black]
+  ask patch -1 -3 [ set pcolor black]
+  ask patch -1 -4 [ set pcolor black]
+  ask patch 0 -4 [ set pcolor black]
+  ask patch 1 -4 [ set pcolor black]
+  ask patch 2 -4 [ set pcolor black]
+  ask patch 3 -4 [ set pcolor black]
+  ask patch 4 -4 [ set pcolor black]
+  ask patch 5 -4 [ set pcolor black]
+  ask patch -6 4 [ set pcolor black]
+  ask patch -6 3 [ set pcolor black]
+  ask patch -6 2 [ set pcolor black]
+  ask patch -5 2 [ set pcolor black]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-161
+165
 10
-588
-438
+687
+533
 -1
 -1
-24.65
+30.24
 1
 10
 1
@@ -143,19 +304,123 @@ GRAPHICS-WINDOW
 8
 -8
 8
-0
-0
+1
+1
 1
 ticks
 30.0
 
 BUTTON
+2
 10
-14
-115
-47
+155
+43
 NIL
 setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+CHOOSER
+4
+295
+160
+340
+state
+state
+"find_shortest_path" "go_path" "reached_goal"
+0
+
+MONITOR
+5
+345
+160
+390
+global_current_robot_step
+global_current_robot_step
+17
+1
+11
+
+SLIDER
+3
+151
+155
+184
+max-steps
+max-steps
+1
+70
+50.0
+1
+1
+steps
+HORIZONTAL
+
+BUTTON
+3
+254
+66
+287
+go
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+75
+255
+160
+288
+go-once
+go
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+3
+74
+156
+107
+setup and randomize goal
+setup-and-randomize-goal
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+2
+111
+156
+144
+setup + set goal in box
+setup-and-set-goal-in-box
 NIL
 1
 T
